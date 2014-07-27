@@ -51,6 +51,7 @@ def test_simple():
     assert len(node3.arcs) == 0
     assert node3.is_final is True
 
+
 def test_eq():
     assert Token('abc', 'abc').root == Token('abc', '(abc)').root
 

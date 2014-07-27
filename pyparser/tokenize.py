@@ -38,7 +38,7 @@ class TokenState(object):
                 if node is end:
                     ret = new_node
                 else:
-                    new_node.copy_from(node, end)
+                    ret = new_node.copy_from(node, end)
         return ret
 
     def __eq__(self, node):
@@ -51,14 +51,15 @@ class TokenState(object):
 
 
 class Token(object):
+
     def __init__(self, name, reg_expr):
         self.name = name
         self.reg_expr = reg_expr
         self.make_states()
 
     def make_states(self):
-        par_stack = [] # for ()
-        in_bra_stack = [] # for ()/[] pair check
+        par_stack = []  # for ()
+        in_bra_stack = []  # for ()/[] pair check
         root = TokenState()
         cur = root
         i = 0
@@ -121,25 +122,26 @@ class Token(object):
         cur.is_final = True
         self.root = root
 
-    def sub_any(self, start, cur):
+    def sub_any(self, start, end):
         # (xx)*
-        start.arc(None, cur)
-        cur.arc(None, start)
+        start.arc(None, end)
+        end.arc(None, start)
 
-    def sub_may_one(self, start, cur):
+    def sub_may_one(self, start, end):
         # (xx)?
-        start.arc(None, cur)
+        start.arc(None, end)
 
-    def sub_one_or_more(self, start, cur):
+    def sub_one_or_more(self, start, end):
         # (xx)+
-        new_end = cur.copy_from(start, cur)
-        new_end.arc(None, cur)
+        new_end = end.copy_from(start, end)
+        new_end.arc(None, end)
 
     def parse(self, stream):
         pass
 
 
 class Tokens(object):
+
     def __init__(self):
         self.tokens = []
 

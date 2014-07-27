@@ -2,6 +2,7 @@
 
 class DFAState(object):
     __slots__ = ['states', 'ids', 'arc_labels', 'is_final', 'freezed', 'arcs']
+
     def __init__(self):
         self.states = []
         self.ids = set()
