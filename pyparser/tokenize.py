@@ -97,11 +97,21 @@ class TokenBuilder(object):
                     if char == ']':
                         pair_made = True
                         break
+                    elif char == '-':
+                        if i + 1 == len(self.reg_expr) or len(chars) == 0:
+                            raise Exception('invalid range -')
+                        end_char = self.reg_expr[i + 1]
+                        start_char = chars[-1]
+                        if start_char >= end_char:
+                            raise Exception('invalid range')
+                        chars.extend(
+                            [chr(x) for x in range(
+                                ord(start_char) + 1, ord(end_char) + 1)])
                     elif char == '\\':
                         if i + 1 == len(self.reg_expr):
                             raise Exception('invalid escape')
                         next_char = self.reg_expr[i + 1]
-                        if next_char in ']\\':
+                        if next_char in ']\\-':
                             char = next_char
                         else:
                             raise Exception('invalid escape')

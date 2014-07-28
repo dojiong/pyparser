@@ -7,7 +7,7 @@ def test_simple():
 
     class Num(TokenBase):
         name = 'num'
-        regular_expr = '[0123456789]+'
+        regular_expr = '[0-9]+'
 
     class String(TokenBase):
         name = 'str'
@@ -22,3 +22,5 @@ def test_simple():
     assert dfa_check(dfa, "'''") is None
     assert dfa_check(dfa, "'") is None
     assert dfa_check(dfa, "") is None
+    assert dfa_check(dfa, "'as") is None
+    assert dfa_check(dfa, "123#") is None
