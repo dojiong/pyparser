@@ -30,16 +30,16 @@ class TokenState(object):
         self.arcs[char].append(node)
         return node
 
-    def copy_from(self, start, end):
-        ret = None
-        for char, nodes in start.arcs.items():
-            for node in nodes:
-                new_node = self.arc(char, TokenState())
-                if node is end:
-                    ret = new_node
-                else:
-                    ret = new_node.copy_from(node, end)
-        return ret
+    # def copy_from(self, start, end):
+    #     ret = None
+    #     for char, nodes in start.arcs.items():
+    #         for node in nodes:
+    #             new_node = self.arc(char, TokenState())
+    #             if node is end:
+    #                 ret = new_node
+    #             else:
+    #                 ret = new_node.copy_from(node, end)
+    #     return ret
 
     def __eq__(self, node):
         if set(self.arcs.keys()) != set(node.arcs.keys()):
@@ -71,8 +71,9 @@ class Token(object):
             elif char == ')':
                 if len(in_bra_stack) == 0 or in_bra_stack[-1]:
                     raise Exception('unmatched `()`')
-                i += 1
+                in_bra_stack.pop()
                 start = par_stack.pop()
+                i += 1
                 if i < len(self.reg_expr):
                     next_char = self.reg_expr[i]
                     if next_char == '?':
@@ -81,7 +82,11 @@ class Token(object):
                         self.sub_one_or_more(start, cur)
                     elif next_char == '*':
                         self.sub_any(start, cur)
-                in_bra_stack.pop()
+                    else:
+                        i -= 1
+                if len(in_bra_stack) > 0 and in_bra_stack[-1]:
+                    end = cur.arc(None, in_bra_stack[-1])
+                    cur = start
             elif char == '[':
                 in_bra_stack.append(TokenState())
             elif char == ']':
@@ -93,13 +98,15 @@ class Token(object):
                     next_char = self.reg_expr[i]
                     if next_char == '?':
                         self.sub_may_one(cur, end)
-                        cur = end
                     elif next_char == '+':
                         self.sub_one_or_more(cur, end)
-                        cur = end
                     elif next_char == '*':
                         self.sub_any(cur, end)
-                        cur = end
+                    else:
+                        i -= 1
+                cur = end
+                if len(in_bra_stack) > 0 and in_bra_stack[-1]:
+                    cur = in_bra_stack[-1]
             elif char == '\\':
                 # \\,\?,\+,\*,\[
                 i += 1
@@ -133,8 +140,7 @@ class Token(object):
 
     def sub_one_or_more(self, start, end):
         # (xx)+
-        new_end = end.copy_from(start, end)
-        new_end.arc(None, end)
+        end.arc(None, start)
 
     def parse(self, stream):
         pass
