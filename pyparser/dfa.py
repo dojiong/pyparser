@@ -93,3 +93,12 @@ def nfa2dfa(start):
             cur.arcs[label] = tstate
     simplify_dfa(states_stack)
     return start
+
+
+def dfa_check(dfa, s):
+    cur = dfa
+    for c in s:
+        cur = cur.arcs.get(c, None)
+        if cur is None:
+            return False
+    return cur.is_final
