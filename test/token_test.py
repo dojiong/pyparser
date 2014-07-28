@@ -1,68 +1,25 @@
-from pyparser.tokenize import *
-from pyparser.dfa import nfa2dfa
-
-
-def test_one_or_more():
-    tok = Token('abc', '[abc]+')
-    assert len(tok.root.arcs) == 3
-    for c in 'abc':
-        assert len(tok.root.arcs[c]) == 1
-    tk = tok.root.arcs['a'][0]
-    assert tk.is_final is True
-    for c in 'abc':
-        assert tok.root.arcs[c][0] is tk
-
-
-def test_may_one():
-    tok = Token('abc', '[abc]?')
-    assert len(tok.root.arcs) == 4
-    for c in ['a', 'b', 'c', None]:
-        assert len(tok.root.arcs[c]) == 1
-    tk = tok.root.arcs['a'][0]
-    assert tk.is_final is True
-    for c in ['a', 'b', 'c', None]:
-        assert tok.root.arcs[c][0] is tk
-
-
-def test_any():
-    tok = Token('abc', '[abc]*')
-    assert len(tok.root.arcs) == 4
-    for c in ['a', 'b', 'c', None]:
-        assert len(tok.root.arcs[c]) == 1
-    tk = tok.root.arcs['a'][0]
-    assert tk.is_final is True
-    for c in ['a', 'b', 'c', None]:
-        assert tok.root.arcs[c][0] is tk
+from pyparser.tokenize import new_token_base
+from pyparser.dfa import dfa_check
+import pdb
 
 
 def test_simple():
-    tok = Token('abc', 'abc')
-    assert len(tok.root.arcs) == 1
-    assert len(tok.root.arcs['a']) == 1
-    node1 = tok.root.arcs['a'][0]
+    TokenBase = new_token_base()
 
-    assert len(node1.arcs) == 1
-    assert len(node1.arcs['b']) == 1
-    node2 = node1.arcs['b'][0]
+    class Num(TokenBase):
+        name = 'num'
+        regular_expr = '[0123456789]+'
 
-    assert len(node2.arcs) == 1
-    assert len(node2.arcs['c']) == 1
-    node3 = node2.arcs['c'][0]
-    assert len(node3.arcs) == 0
-    assert node3.is_final is True
+    class String(TokenBase):
+        name = 'str'
+        regular_expr = '\'[^\']*\''
 
+    dfa = TokenBase.generate_dfa()
 
-def test_eq():
-    assert Token('abc', 'abc').root == Token('abc', '(abc)').root
-
-
-def test_dfa():
-    tok = Token('abc', '(ab)*ac')
-    s1 = nfa2dfa(tok.root)
-    assert len(s1.arcs) == 1
-    s2 = s1.arcs['a']
-    assert len(s2.arcs) == 2
-    assert s2.arcs['b'] is s1
-    s3 = s2.arcs['c']
-    assert len(s3.arcs) == 0
-    assert s3.is_final is True
+    assert isinstance(dfa_check(dfa, "'asdf'"), String)
+    assert isinstance(dfa_check(dfa, "''"), String)
+    assert isinstance(dfa_check(dfa, "1"), Num)
+    assert isinstance(dfa_check(dfa, "1345"), Num)
+    assert dfa_check(dfa, "'''") is None
+    assert dfa_check(dfa, "'") is None
+    assert dfa_check(dfa, "") is None

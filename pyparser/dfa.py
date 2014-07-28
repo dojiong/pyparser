@@ -1,7 +1,27 @@
 
 
+class NegLabel(object):
+    __slots__ = ['labels']
+
+    def __init__(self, labels):
+        self.labels = set(labels)
+
+    def __hash__(self):
+        return id(self)
+
+    def join(self, other):
+        if not isinstance(other, NegLabel):
+            raise Exception('invalid NegLabel')
+        self.labels = self.labels.intersection(other.labels)
+
+    def __eq__(self, other):
+        return self.labels == other.labels
+
+
 class DFAState(object):
-    __slots__ = ['states', 'ids', 'arc_labels', 'is_final', 'freezed', 'arcs']
+    __slots__ = ['states', 'ids', 'arc_labels',
+        'is_final', 'freezed', 'arcs', 'neg_label',
+        'neg_state', 'data']
 
     def __init__(self):
         self.states = []
@@ -10,6 +30,9 @@ class DFAState(object):
         self.arcs = {}
         self.is_final = False
         self.freezed = False
+        self.neg_label = None
+        self.neg_state = None
+        self.data = None
 
     def __contains__(self, nfa):
         return nfa.id in self.ids
@@ -26,9 +49,17 @@ class DFAState(object):
                     self.arc_labels.add(label)
             if state.is_final:
                 self.is_final = True
+                if self.data is not None and self.data is not state.data:
+                    raise Exception('state accept the same data')
+                self.data = state.data
 
     def freeze(self):
         for label, state in self.get_arcs():
+            if isinstance(label, NegLabel):
+                if self.neg_label is not None:
+                    raise Exception('`neg or` not supported')
+                self.neg_label = label
+                self.neg_state = state
             self.arcs[label] = state
         self.ids = '.'.join([str(x) for x in self.ids])
         self.states = None
@@ -44,9 +75,11 @@ class DFAState(object):
             yield label, tstate
 
     def out_equals(self, other):
-        if len(self.arcs) != len(other.arcs):
-            return False
         if self.is_final != other.is_final:
+            return False
+        if self.data is not other.data:
+            return False
+        if len(self.arcs) != len(other.arcs):
             return False
         for label, state in self.arcs.items():
             if state is not other.arcs.get(label, None):
@@ -54,6 +87,8 @@ class DFAState(object):
         return True
 
     def replace(self, fr, to):
+        if self.neg_state is fr:
+            self.neg_state = to
         for label, state in self.arcs.items():
             if state is fr:
                 self.arcs[label] = to
@@ -89,6 +124,8 @@ def nfa2dfa(start):
                 pending.append(tstate)
                 states_stack.append(tstate)
             else:
+                if tstate is cur.neg_state:
+                    cur.neg_state = old_tstate
                 tstate = old_tstate
             cur.arcs[label] = tstate
     simplify_dfa(states_stack)
@@ -98,7 +135,13 @@ def nfa2dfa(start):
 def dfa_check(dfa, s):
     cur = dfa
     for c in s:
-        cur = cur.arcs.get(c, None)
-        if cur is None:
-            return False
-    return cur.is_final
+        next = cur.arcs.get(c, None)
+        if next is None:
+            if cur.neg_label is not None and c not in cur.neg_label.labels:
+                cur = cur.neg_state
+            else:
+                return None
+        else:
+            cur = next
+    if cur.is_final:
+        return cur.data(s)
