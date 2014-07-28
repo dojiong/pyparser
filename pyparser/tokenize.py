@@ -1,14 +1,16 @@
 from collections import defaultdict
-from .dfa import DFAState
+from .dfa import DFAState, nfa2dfa, NegLabel
 
 
 class TokenState(object):
-    __slots__ = ['arcs', 'is_final', 'id']
+    __slots__ = ['arcs', 'is_final', 'id', 'data', 'accept_any']
     _auto_id = 0
 
     def __init__(self):
         self.arcs = defaultdict(lambda: [])
         self.is_final = False
+        self.data = None
+        self.accept_any = False
         self.id = self.get_id()
 
     @classmethod
@@ -30,18 +32,8 @@ class TokenState(object):
         self.arcs[char].append(node)
         return node
 
-    # def copy_from(self, start, end):
-    #     ret = None
-    #     for char, nodes in start.arcs.items():
-    #         for node in nodes:
-    #             new_node = self.arc(char, TokenState())
-    #             if node is end:
-    #                 ret = new_node
-    #             else:
-    #                 ret = new_node.copy_from(node, end)
-    #     return ret
-
     def __eq__(self, node):
+        # for test compare
         if set(self.arcs.keys()) != set(node.arcs.keys()):
             return False
         for k, v in self.arcs.items():
@@ -50,29 +42,27 @@ class TokenState(object):
         return True
 
 
-class Token(object):
+class TokenBuilder(object):
 
-    def __init__(self, name, reg_expr):
-        self.name = name
-        self.reg_expr = reg_expr
+    def __init__(self, cls):
+        self.token = cls
+        self.reg_expr = cls.regular_expr
         self.make_states()
 
     def make_states(self):
+        # FIXME code tidy
         par_stack = []  # for ()
-        in_bra_stack = []  # for ()/[] pair check
         root = TokenState()
         cur = root
         i = 0
         while i < len(self.reg_expr):
             char = self.reg_expr[i]
             if char == '(':
-                par_stack.append(cur)
-                in_bra_stack.append(None)
+                par_stack.append([cur, None])
             elif char == ')':
-                if len(in_bra_stack) == 0 or in_bra_stack[-1]:
-                    raise Exception('unmatched `()`')
-                in_bra_stack.pop()
-                start = par_stack.pop()
+                start, or_state = par_stack.pop()
+                if or_state is not None:
+                    cur = or_state
                 i += 1
                 if i < len(self.reg_expr):
                     next_char = self.reg_expr[i]
@@ -84,16 +74,49 @@ class Token(object):
                         self.sub_any(start, cur)
                     else:
                         i -= 1
-                if len(in_bra_stack) > 0 and in_bra_stack[-1]:
-                    end = cur.arc(None, in_bra_stack[-1])
-                    cur = start
+            elif char == '|':
+                if len(par_stack) == 0:
+                    raise Exception('invalid `|`,not in ()')
+                start = par_stack[-1]
+                if start[1] is None:
+                    start[1] = TokenState()
+                cur.arc(None, start[1])
+                cur = start[0]
             elif char == '[':
-                in_bra_stack.append(TokenState())
-            elif char == ']':
-                if len(in_bra_stack) == 0 or not in_bra_stack[-1]:
-                    raise Exception('unmatched `[]`')
+                neg = False
                 i += 1
-                end = in_bra_stack.pop()
+                if i < len(self.reg_expr):
+                    next_char = self.reg_expr[i]
+                    if next_char == '^':
+                        neg = True
+                        i += 1
+                pair_made = False
+                chars = []
+                while i < len(self.reg_expr):
+                    char = self.reg_expr[i]
+                    if char == ']':
+                        pair_made = True
+                        break
+                    elif char == '\\':
+                        if i + 1 == len(self.reg_expr):
+                            raise Exception('invalid escape')
+                        next_char = self.reg_expr[i + 1]
+                        if next_char in ']\\':
+                            char = next_char
+                        else:
+                            raise Exception('invalid escape')
+                        i += 1
+                    chars.append(char)
+                    i += 1
+                if not pair_made:
+                    raise Exception('unmatched []')
+                end = TokenState()
+                if neg:
+                    cur.arc(NegLabel(chars), end)
+                else:
+                    for char in chars:
+                        cur.arc(char, end)
+                i += 1
                 if i < len(self.reg_expr):
                     next_char = self.reg_expr[i]
                     if next_char == '?':
@@ -105,29 +128,25 @@ class Token(object):
                     else:
                         i -= 1
                 cur = end
-                if len(in_bra_stack) > 0 and in_bra_stack[-1]:
-                    cur = in_bra_stack[-1]
             elif char == '\\':
                 # \\,\?,\+,\*,\[
                 i += 1
                 if i == len(self.reg_expr):
                     raise Exception('invalid escape(at end)')
                 next_char = self.reg_expr[i]
-                if next_char in '\\?+*()[]':
-                    if len(in_bra_stack) and in_bra_stack[-1]:
-                        cur.arc(next_char, in_bra_stack[-1])
-                    else:
-                        cur = cur.arc(next_char, TokenState())
+                if next_char in '\\?+*()[|':
+                    cur = cur.arc(next_char, TokenState())
                 else:
                     raise Exception('invalid escape')
             else:
-                if len(in_bra_stack) and in_bra_stack[-1]:
-                    cur.arc(char, in_bra_stack[-1])
-                else:
-                    cur = cur.arc(char, TokenState())
+                cur = cur.arc(char, TokenState())
             i += 1
+        if len(par_stack) != 0:
+            raise Exception('unmatched ()')
         cur.is_final = True
+        cur.data = self.token
         self.root = root
+        return root
 
     def sub_any(self, start, end):
         # (xx)*
@@ -142,14 +161,40 @@ class Token(object):
         # (xx)+
         end.arc(None, start)
 
-    def parse(self, stream):
-        pass
+
+class TokenBaseMixin(object):
+
+    def __init__(self, data):
+        self.data = data
+
+    @classmethod
+    def generate_dfa(cls):
+        states = cls.__token_states__
+        root = TokenState()
+        for state in states.values():
+            root.arc(None, state)
+        cls.dfa = nfa2dfa(root)
+        return cls.dfa
 
 
-class Tokens(object):
+def new_token_base():
+    class TokenMeta(type):
+        def __new__(meta, name, bases, attrs):
+            if '__token_base__' in attrs:
+                attrs.pop('__token_base__')
+                return type.__new__(meta, name, bases, attrs)
 
-    def __init__(self):
-        self.tokens = []
+            name = attrs.get('name', None)
+            reg_expr = attrs.get('regular_expr', None)
+            if name is None or reg_expr is None:
+                raise TypeError('missing name or regular_expr')
 
-    def add(self, tok):
-        self.tokens.append(tok)
+            cls = type.__new__(meta, name, bases, attrs)
+            states = cls.__token_states__
+            if name in states:
+                raise TypeError('Token %s duplicated' % name)
+            states[name] = TokenBuilder(cls).root
+            return cls
+
+    return TokenMeta('TokenBase', (TokenBaseMixin,),
+        {'__token_states__': {}, '__token_base__': True})
