@@ -20,6 +20,7 @@ def test_simple():
     assert isinstance(dfa_check(dfa, "'asdf\\''"), String)
     assert isinstance(dfa_check(dfa, "'\\'asdf'"), String)
     assert isinstance(dfa_check(dfa, "'\\nasdf'"), String)
+    assert dfa_check(dfa, "'\\asdf'") is None
     assert isinstance(dfa_check(dfa, "''"), String)
     assert isinstance(dfa_check(dfa, "1"), Num)
     assert isinstance(dfa_check(dfa, "1345"), Num)
