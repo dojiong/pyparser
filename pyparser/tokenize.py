@@ -60,9 +60,9 @@ class TokenBuilder(object):
             if char == '(':
                 par_stack.append([cur, None])
             elif char == ')':
-                start, or_state = par_stack.pop()
-                if or_state is not None:
-                    cur = or_state
+                start, or_end = par_stack.pop()
+                if or_end is not None:
+                    cur = cur.arc(None, or_end)
                 i += 1
                 if i < len(self.reg_expr):
                     next_char = self.reg_expr[i]
@@ -107,6 +107,8 @@ class TokenBuilder(object):
                         chars.extend(
                             [chr(x) for x in range(
                                 ord(start_char) + 1, ord(end_char) + 1)])
+                        i += 2
+                        continue
                     elif char == '\\':
                         if i + 1 == len(self.reg_expr):
                             raise Exception('invalid escape')

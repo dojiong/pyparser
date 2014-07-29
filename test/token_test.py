@@ -11,11 +11,15 @@ def test_simple():
 
     class String(TokenBase):
         name = 'str'
-        regular_expr = '\'[^\']*\''
+        regular_expr = "'(\\\\['rnt]|[^'])*'"
 
     dfa = TokenBase.generate_dfa()
 
     assert isinstance(dfa_check(dfa, "'asdf'"), String)
+    assert isinstance(dfa_check(dfa, "'asdf\\'x'"), String)
+    assert isinstance(dfa_check(dfa, "'asdf\\''"), String)
+    assert isinstance(dfa_check(dfa, "'\\'asdf'"), String)
+    assert isinstance(dfa_check(dfa, "'\\nasdf'"), String)
     assert isinstance(dfa_check(dfa, "''"), String)
     assert isinstance(dfa_check(dfa, "1"), Num)
     assert isinstance(dfa_check(dfa, "1345"), Num)
