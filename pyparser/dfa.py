@@ -34,6 +34,14 @@ class DFAState(object):
         self.neg_state = None
         self.data = None
 
+    def next(self, label):
+        state = self.arcs.get(label, None)
+        if state is None:
+            if self.neg_state is not None:
+                if label not in self.neg_label.arcs:
+                    state = self.neg_state
+        return state
+
     def __contains__(self, nfa):
         return nfa.id in self.ids
 

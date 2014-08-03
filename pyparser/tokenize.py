@@ -174,6 +174,43 @@ class TokenBuilder(object):
         end.arc(None, start)
 
 
+class Tokenizer(object):
+    def __init__(self, token_base, root):
+        self.token_base = token_base
+        self.root = root
+
+    def tokens(self, data):
+        cur = self.root
+        start_i = 0
+        i = 0
+        lineno = 1
+        line_index = 0
+        while i < len(data):
+            char = data[i]
+            next = cur.next(char)
+            if next is None:
+                if cur.is_final:
+                    if not cur.data.ignore:
+                        yield cur.data(data[start_i:i])
+                    start_i = i
+                    cur = self.root
+                else:
+                    raise self.token_base.UnexpectedCharError(
+                        lineno, line_index, char)
+            else:
+                cur = next
+                i += 1
+                line_index += 1
+                if char == '\n':
+                    lineno += 1
+                    line_index = 0
+        if cur.is_final:
+            if not cur.data.ignore:
+                yield cur.data(data[start_i:])
+        else:
+            raise self.token_base.UnexpectedEOFError()
+
+
 class TokenBaseMixin(object):
 
     def __init__(self, data):
@@ -185,8 +222,21 @@ class TokenBaseMixin(object):
         root = TokenState()
         for state in states.values():
             root.arc(None, state)
-        cls.dfa = nfa2dfa(root)
-        return cls.dfa
+        dfa = nfa2dfa(root)
+        if dfa.is_final:
+            raise Exception(
+                'invalid token, accept empty string: %s' % dfa.data.name)
+        return dfa
+
+    @classmethod
+    def get_tokenizer(cls):
+        return Tokenizer(cls, cls.generate_dfa())
+
+    def __repr__(self):
+        return '%s(%r)' % (self.__class__.__name__, self.data)
+
+    def __eq__(self, other):
+        return other.__class__ == self.__class__ and other.data == self.data
 
 
 def new_token_base():
@@ -196,10 +246,11 @@ def new_token_base():
                 attrs.pop('__token_base__')
                 return type.__new__(meta, name, bases, attrs)
 
-            name = attrs.get('name', None)
             reg_expr = attrs.get('regular_expr', None)
-            if name is None or reg_expr is None:
-                raise TypeError('missing name or regular_expr')
+            if reg_expr is None:
+                raise TypeError('missing regular_expr')
+            if 'ignore' not in attrs:
+                attrs['ignore'] = False
 
             cls = type.__new__(meta, name, bases, attrs)
             states = cls.__token_states__
@@ -208,5 +259,21 @@ def new_token_base():
             states[name] = TokenBuilder(cls).root
             return cls
 
+    class UnexpectedCharError(Exception):
+        def __init__(self, lineno, index, char):
+            self.lineno = lineno
+            self.index = index
+            self.char = char
+
+        def __str__(self):
+            return 'unexpected char at line %d:%d %r' % (
+                self.lineno, self.index, self.char)
+
+    class UnexpectedEOFError(Exception):
+        pass
+
     return TokenMeta('TokenBase', (TokenBaseMixin,),
-        {'__token_states__': {}, '__token_base__': True})
+        {'__token_states__': {},
+         '__token_base__': True,
+         'UnexpectedCharError': UnexpectedCharError,
+         'UnexpectedEOFError': UnexpectedEOFError})

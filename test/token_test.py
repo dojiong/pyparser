@@ -6,11 +6,9 @@ def test_simple():
     TokenBase = new_token_base()
 
     class Num(TokenBase):
-        name = 'num'
         regular_expr = '[0-9]+'
 
     class String(TokenBase):
-        name = 'str'
         regular_expr = "'(\\\\['rnt]|[^'])*'"
 
     dfa = TokenBase.generate_dfa()
@@ -29,3 +27,46 @@ def test_simple():
     assert dfa_check(dfa, "") is None
     assert dfa_check(dfa, "'as") is None
     assert dfa_check(dfa, "123#") is None
+
+
+struct_a = '''struct user {
+    name: string
+    id: int64
+    email: string
+}
+'''
+
+
+def test_tokens():
+    TokenBase = new_token_base()
+
+    class Num(TokenBase):
+        regular_expr = '[0-9]+'
+
+    class String(TokenBase):
+        regular_expr = "'(\\\\['rnt]|[^'])*'"
+
+    class Name(TokenBase):
+        regular_expr = '[a-zA-Z_][a-zA-Z_0-9]*'
+
+    class Op(TokenBase):
+        regular_expr = '[{}()[\\]+\\-*/:]'
+
+    class Newline(TokenBase):
+        regular_expr = '((\r)?\n)((\r)?\n| )*'
+
+    class Blank(TokenBase):
+        regular_expr = '[ \t]+'
+        ignore = True
+
+    tks = [
+        Name('struct'), Name('user'), Op('{'), Newline('\n    '),
+            Name('name'), Op(':'), Name('string'), Newline('\n    '),
+            Name('id'), Op(':'), Name('int64'), Newline('\n    '),
+            Name('email'), Op(':'), Name('string'), Newline('\n'),
+        Op('}'), Newline('\n'),
+    ]
+
+    tokenize = TokenBase.get_tokenizer()
+    for token, expect in zip(tokenize.tokens(struct_a), tks):
+        assert token == expect
