@@ -13,33 +13,18 @@ class TokenState(object):
         self.accept_any = False
         self.id = self.get_id()
 
+    def __hash__(self):
+        return self.id
+
     @classmethod
     def get_id(cls):
         cls._auto_id += 1
         return cls._auto_id - 1
 
-    def epsilon_closure(self, tstate=None):
-        ret = tstate or DFAState()
-        ret.add(self)
-        if None in self.arcs:
-            for state in self.arcs[None]:
-                if state not in ret:
-                    state.epsilon_closure(ret)
-        return ret
-
     def arc(self, char, node):
         assert node is not None
         self.arcs[char].append(node)
         return node
-
-    def __eq__(self, node):
-        # for test compare
-        if set(self.arcs.keys()) != set(node.arcs.keys()):
-            return False
-        for k, v in self.arcs.items():
-            if v != node.arcs[k]:
-                return False
-        return True
 
 
 class TokenBuilder(object):
@@ -175,6 +160,7 @@ class TokenBuilder(object):
 
 
 class Tokenizer(object):
+
     def __init__(self, token_base, root):
         self.token_base = token_base
         self.root = root
@@ -241,6 +227,7 @@ class TokenBaseMixin(object):
 
 def new_token_base():
     class TokenMeta(type):
+
         def __new__(meta, name, bases, attrs):
             if '__token_base__' in attrs:
                 attrs.pop('__token_base__')
@@ -260,6 +247,7 @@ def new_token_base():
             return cls
 
     class UnexpectedCharError(Exception):
+
         def __init__(self, lineno, index, char):
             self.lineno = lineno
             self.index = index
@@ -273,7 +261,7 @@ def new_token_base():
         pass
 
     return TokenMeta('TokenBase', (TokenBaseMixin,),
-        {'__token_states__': {},
-         '__token_base__': True,
-         'UnexpectedCharError': UnexpectedCharError,
-         'UnexpectedEOFError': UnexpectedEOFError})
+                     {'__token_states__': {},
+                      '__token_base__': True,
+                      'UnexpectedCharError': UnexpectedCharError,
+                      'UnexpectedEOFError': UnexpectedEOFError})

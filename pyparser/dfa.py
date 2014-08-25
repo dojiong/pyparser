@@ -20,19 +20,18 @@ class NegLabel(object):
 
 class DFAState(object):
     __slots__ = ['states', 'ids', 'arc_labels',
-        'is_final', 'freezed', 'arcs', 'neg_label',
+        'is_final', 'arcs', 'neg_label',
         'neg_state', 'data']
 
     def __init__(self):
         self.states = []
-        self.ids = set()
         self.arc_labels = set()
         self.arcs = {}
         self.is_final = False
-        self.freezed = False
         self.neg_label = None
         self.neg_state = None
         self.data = None
+        self.ids = set()
 
     def next(self, label):
         state = self.arcs.get(label, None)
@@ -42,45 +41,33 @@ class DFAState(object):
                     state = self.neg_state
         return state
 
-    def __contains__(self, nfa):
-        return nfa.id in self.ids
-
-    def add(self, state):
-        if self.freezed:
-            raise Exception('state freezed')
-
-        if state.id not in self.ids:
-            self.states.append(state)
-            self.ids.add(state.id)
-            for label in state.arcs.keys():
-                if label is not None:
-                    self.arc_labels.add(label)
-            if state.is_final:
-                self.is_final = True
-                if self.data is not None and self.data is not state.data:
-                    raise Exception('state accept the same data')
-                self.data = state.data
-
-    def freeze(self):
-        for label, state in self.get_arcs():
-            if isinstance(label, NegLabel):
-                if self.neg_label is not None:
-                    raise Exception('`neg or` not supported')
-                self.neg_label = label
-                self.neg_state = state
-            self.arcs[label] = state
-        self.ids = '.'.join([str(x) for x in self.ids])
-        self.states = None
-        self.freezed = True
-
-    def get_arcs(self):
-        for label in self.arc_labels:
-            tstate = DFAState()
-            for state in self.states:
-                if label in state.arcs:
-                    for s in state.arcs[label]:
-                        s.epsilon_closure(tstate)
-            yield label, tstate
+    def add(self, *nfas):
+        for nfa in nfas:
+            if nfa.id not in self.ids:
+                self.states.append(nfa)
+                self.ids.add(nfa.id)
+                if nfa.is_final:
+                    self.is_final = True
+                    if self.data is not None and self.data is not nfa.data:
+                        raise Exception('state accept the same data')
+                    self.data = nfa.data
+                for label, nfa_dsts in nfa.arcs.items():
+                    if label is None:
+                        continue
+                    if isinstance(label, NegLabel):
+                        if self.neg_label is not None:
+                            self.neg_label.join(label)
+                            self.neg_state.extend(nfa_dsts)
+                            continue
+                        self.neg_label = label
+                        self.neg_state = nfa_dsts[:]
+                        self.arcs[label] = self.neg_state
+                    else:
+                        nfas = self.arcs.get(label, None)
+                        if nfas is None:
+                            self.arcs[label] = nfa_dsts[:]
+                        else:
+                            nfas.extend(nfa_dsts)
 
     def out_equals(self, other):
         if self.is_final != other.is_final:
@@ -117,26 +104,53 @@ def simplify_dfa(states):
                     break
 
 
-def nfa2dfa(start):
-    start = start.epsilon_closure()
-    start.freeze()
-    states = {start.ids: start}
-    states_stack = [start]
-    pending = [start]
-    for cur in pending:
-        for label, tstate in cur.arcs.items():
-            tstate.freeze()
-            old_tstate = states.get(tstate.ids, None)
-            if old_tstate is None:
-                states[tstate.ids] = tstate
-                pending.append(tstate)
-                states_stack.append(tstate)
-            else:
-                if tstate is cur.neg_state:
-                    cur.neg_state = old_tstate
-                tstate = old_tstate
-            cur.arcs[label] = tstate
-    simplify_dfa(states_stack)
+def epsilon_closure(nfa, eps):
+    eps.add(nfa)
+    if None in nfa.arcs:
+        for nfa_dst in nfa.arcs[None]:
+            if nfa_dst not in eps:
+                epsilon_closure(nfa_dst, eps)
+    return eps
+
+
+def epsilon_closure_set(nfas, boost, eps):
+    ids = set()
+    for nfa in nfas:
+        cache = boost.get(nfa.id, None)
+        if cache is None:
+            cache = epsilon_closure(nfa, set())
+            boost[nfa.id] = cache
+        ids.update([x.id for x in cache])
+        eps.update(cache)
+
+    return '.'.join([str(x) for x in ids]), eps
+
+
+def nfa2dfa(start_nfa):
+    boost = {}
+    start = DFAState()
+    eps = epsilon_closure(start_nfa, set())
+    boost[start_nfa.id] = eps
+    start.add(*eps)
+    ids = '.'.join([str(x) for x in start.ids])
+    boost[ids] = start
+
+    states = [start]
+    for cur in states:
+        arcs = {}
+        for label, nfas in cur.arcs.items():
+            ids, eps = epsilon_closure_set(nfas, boost, set())
+            dfa = boost.get(ids, None)
+            if dfa is None:
+                dfa = DFAState()
+                dfa.add(*eps)
+                boost[ids] = dfa
+                states.append(dfa)
+            arcs[label] = dfa
+        if cur.neg_label is not None:
+            cur.neg_state = arcs[cur.neg_label]
+        cur.arcs = arcs
+    simplify_dfa(states)
     return start
 
 

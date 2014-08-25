@@ -61,12 +61,16 @@ def test_tokens():
 
     tks = [
         Name('struct'), Name('user'), Op('{'), Newline('\n    '),
-            Name('name'), Op(':'), Name('string'), Newline('\n    '),
-            Name('id'), Op(':'), Name('int64'), Newline('\n    '),
-            Name('email'), Op(':'), Name('string'), Newline('\n'),
+        Name('name'), Op(':'), Name('string'), Newline('\n    '),
+        Name('id'), Op(':'), Name('int64'), Newline('\n    '),
+        Name('email'), Op(':'), Name('string'), Newline('\n'),
         Op('}'), Newline('\n'),
     ]
 
     tokenize = TokenBase.get_tokenizer()
     for token, expect in zip(tokenize.tokens(struct_a), tks):
         assert token == expect
+
+
+if __name__ == '__main__':
+    test_tokens()
