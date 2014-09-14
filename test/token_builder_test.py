@@ -3,6 +3,7 @@ from pyparser.dfa import nfa2dfa
 
 
 class FakeToken(object):
+
     def __init__(self, name, reg_expr):
         self.name = name
         self.regular_expr = reg_expr
@@ -58,7 +59,6 @@ def test_simple():
     assert node3.is_final is True
 
 
-
 def equal_state(a, b):
     if set(a.arcs.keys()) != set(b.arcs.keys()):
         return False
@@ -72,7 +72,8 @@ def equal_state(a, b):
 
 
 def test_eq():
-    assert equal_state(TokenBuilder(FakeToken('abc', 'abc')).root, TokenBuilder(FakeToken('abc', '(abc)')).root)
+    assert equal_state(TokenBuilder(FakeToken('abc', 'abc')).root,
+                       TokenBuilder(FakeToken('abc', '(abc)')).root)
 
 
 def test_dfa():

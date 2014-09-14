@@ -20,8 +20,8 @@ class NegLabel(object):
 
 class DFAState(object):
     __slots__ = ['states', 'ids', 'arc_labels',
-        'is_final', 'arcs', 'neg_label',
-        'neg_state', 'data']
+                 'is_final', 'arcs', 'neg_label',
+                 'neg_state', 'data']
 
     def __init__(self):
         self.states = []

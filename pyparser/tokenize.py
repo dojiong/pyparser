@@ -1,5 +1,5 @@
 from collections import defaultdict
-from .dfa import DFAState, nfa2dfa, NegLabel
+from .dfa import nfa2dfa, NegLabel
 
 
 class TokenState(object):
