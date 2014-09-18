@@ -1,3 +1,28 @@
+from collections import defaultdict
+
+
+class NFAState(object):
+    __slots__ = ['arcs', 'is_final', 'id', 'data']
+    _auto_id = 0
+
+    def __init__(self):
+        self.arcs = defaultdict(lambda: [])
+        self.is_final = False
+        self.data = None
+        self.id = self.get_id()
+
+    def __hash__(self):
+        return self.id
+
+    @classmethod
+    def get_id(cls):
+        cls._auto_id += 1
+        return cls._auto_id - 1
+
+    def arc(self, label, node):
+        assert node is not None
+        self.arcs[label].append(node)
+        return node
 
 
 class NegLabel(object):
@@ -37,7 +62,7 @@ class DFAState(object):
         state = self.arcs.get(label, None)
         if state is None:
             if self.neg_state is not None:
-                if label not in self.neg_label.arcs:
+                if label not in self.neg_label.labels:
                     state = self.neg_state
         return state
 

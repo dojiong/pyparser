@@ -1,30 +1,4 @@
-from collections import defaultdict
-from .dfa import nfa2dfa, NegLabel
-
-
-class TokenState(object):
-    __slots__ = ['arcs', 'is_final', 'id', 'data', 'accept_any']
-    _auto_id = 0
-
-    def __init__(self):
-        self.arcs = defaultdict(lambda: [])
-        self.is_final = False
-        self.data = None
-        self.accept_any = False
-        self.id = self.get_id()
-
-    def __hash__(self):
-        return self.id
-
-    @classmethod
-    def get_id(cls):
-        cls._auto_id += 1
-        return cls._auto_id - 1
-
-    def arc(self, char, node):
-        assert node is not None
-        self.arcs[char].append(node)
-        return node
+from .dfa import nfa2dfa, NegLabel, NFAState
 
 
 class TokenBuilder(object):
@@ -37,7 +11,7 @@ class TokenBuilder(object):
     def make_states(self):
         # FIXME code tidy
         par_stack = []  # for ()
-        root = TokenState()
+        root = NFAState()
         cur = root
         i = 0
         while i < len(self.reg_expr):
@@ -64,7 +38,7 @@ class TokenBuilder(object):
                     raise Exception('invalid `|`,not in ()')
                 start = par_stack[-1]
                 if start[1] is None:
-                    start[1] = TokenState()
+                    start[1] = NFAState()
                 cur.arc(None, start[1])
                 cur = start[0]
             elif char == '[':
@@ -107,7 +81,7 @@ class TokenBuilder(object):
                     i += 1
                 if not pair_made:
                     raise Exception('unmatched []')
-                end = TokenState()
+                end = NFAState()
                 if neg:
                     cur.arc(NegLabel(chars), end)
                 else:
@@ -132,11 +106,11 @@ class TokenBuilder(object):
                     raise Exception('invalid escape(at end)')
                 next_char = self.reg_expr[i]
                 if next_char in '\\?+*()[|':
-                    cur = cur.arc(next_char, TokenState())
+                    cur = cur.arc(next_char, NFAState())
                 else:
                     raise Exception('invalid escape')
             else:
-                cur = cur.arc(char, TokenState())
+                cur = cur.arc(char, NFAState())
             i += 1
         if len(par_stack) != 0:
             raise Exception('unmatched ()')
@@ -164,6 +138,9 @@ class Tokenizer(object):
     def __init__(self, token_base, root):
         self.token_base = token_base
         self.root = root
+
+    def get_token_cls(self, name):
+        return self.token_base.__token_states__.get(name, None)
 
     def tokens(self, data):
         cur = self.root
@@ -205,7 +182,7 @@ class TokenBaseMixin(object):
     @classmethod
     def generate_dfa(cls):
         states = cls.__token_states__
-        root = TokenState()
+        root = NFAState()
         for state in states.values():
             root.arc(None, state)
         dfa = nfa2dfa(root)
@@ -264,4 +241,5 @@ def new_token_base():
                      {'__token_states__': {},
                       '__token_base__': True,
                       'UnexpectedCharError': UnexpectedCharError,
-                      'UnexpectedEOFError': UnexpectedEOFError})
+                      'UnexpectedEOFError': UnexpectedEOFError,
+                      '__slots__': ['data']})

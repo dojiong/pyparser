@@ -1,0 +1,19 @@
+# pysql grammer
+
+
+# column -> converter(column1, coulmn2) -> [hide_column]after:new_column
+# converter(column)
+
+PySQL = Prepare SQL ;
+
+Prepare = (Replace ';' | Append ';')* ;
+
+Replace = Name '->' Conveter ;
+
+Append = Conveter '->' ('[' Args ']')?(Name ':')?Name ;
+
+Conveter = Name '(' Args ')' ;
+
+Args = Name (',' Name)* ;
+
+SQL = (SQLCode | PyCode)+ ;
