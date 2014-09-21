@@ -156,6 +156,8 @@ class ASTBuilder(object):
                         elif op == '*':
                             start.arc(None, end)
                             end.arc(None, start)
+                        if cur is not end:
+                            cur = cur.arc(None, end)
                 elif isinstance(tk, Or):
                     if len(par_stack) == 0:
                         raise GrammarError('invalid `|`, missing `(`')
